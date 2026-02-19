@@ -37,23 +37,41 @@ static bool cli_opt_require(const struct cli_opt *const opt, void *const ptr) {
 }
 
 static bool cli_opts_verify(const struct cli_opt *const opts) {
+  bool ok = true;
+
   for (const struct cli_opt *o = opts; o->type != CLI_OPT_TYPE_END; o++) {
+    switch (o->type) {
+    case CLI_OPT_TYPE_END:
+    case CLI_OPT_TYPE_HELP:
+    case CLI_OPT_TYPE_ACTION:
+    case CLI_OPT_TYPE_STRING:
+    case CLI_OPT_TYPE_DOUBLE:
+    case CLI_OPT_TYPE_FLOAT:
+    case CLI_OPT_TYPE_LONG:
+    case CLI_OPT_TYPE_INTEGER:
+    case CLI_OPT_TYPE_BOOLEAN:
+      break;
+    default:
+      cli_opts_error("invalid cli_opt_type '%d'", o->type);
+      ok = false;
+    }
+
     if (o->shorthand == '\0' && o->longhand == NULL) {
       cli_opts_error("options must have either a shorthand or longhand");
-      return false;
+      ok = false;
     }
 
     switch (o->type) {
     case CLI_OPT_TYPE_ACTION:
       if (!cli_opt_require(o, o->action)) {
-        return false;
+        ok = false;
       }
       break;
     case CLI_OPT_TYPE_HELP:
       break;
     default:
       if (!cli_opt_require(o, o->dest)) {
-        return false;
+        ok = false;
       }
     }
 
@@ -61,17 +79,17 @@ static bool cli_opts_verify(const struct cli_opt *const opts) {
          next++) {
       if (o->shorthand && o->shorthand == next->shorthand) {
         cli_opts_error("duplicate shorthand '-%c'", o->shorthand);
-        return false;
+        ok = false;
       }
 
       if (o->longhand && o->longhand == next->longhand) {
         cli_opts_error("duplicate longhand '--%s'", o->longhand);
-        return false;
+        ok = false;
       }
     }
   }
 
-  return true;
+  return ok;
 }
 
 void cli_opts_init(struct cli_opts *const app, struct cli_opt *const opts,
@@ -86,96 +104,22 @@ void cli_opts_init(struct cli_opts *const app, struct cli_opt *const opts,
     exit(EXIT_FAILURE);
   }
 
-  memset(app, 0, sizeof(*app));
-
   if (!cli_opts_verify(opts)) {
     exit(EXIT_FAILURE);
   }
+
+  memset(app, 0, sizeof(*app));
 
   app->opts = opts;
   app->desc = desc;
 }
 
-static void cli_opts_usage(const struct cli_opt *const opt) {}
-
-static bool cli_opts_shift(struct cli_opts *const app) {
-  if (app->token && *app->token != '\0') {
-    app->argv = &app->token;
-    app->token = NULL;
-    return true;
-  }
-
-  if (app->argc > 1) {
-    app->argc--;
-    app->argv++;
-    return true;
-  }
-
-  return false;
+static void cli_opts_usage(const struct cli_opt *const opt) {
+  // TODO: print usage
 }
 
-static bool cli_opt_populate(struct cli_opts *const app,
-                             const struct cli_opt *opt) {
-  if (!(cli_opts_shift(app))) {
-    cli_opts_error("no value '%s'", *app->argv);
-    return false;
-  }
-
-  if (opt->type == CLI_OPT_TYPE_ARRAY) {
-    // TODO: populate array
-    return true;
-  } else if (opt->type == CLI_OPT_TYPE_STRING) {
-    *(const char **)opt->dest = *app->argv;
-    return true;
-  }
-
-  char *endptr;
-  union {
-    long l;
-    double d;
-  } val;
-
-  if (opt->type == CLI_OPT_TYPE_INTEGER || opt->type == CLI_OPT_TYPE_LONG) {
-    val.l = strtol(*app->argv, &endptr, 10);
-  } else {
-    val.d = strtod(*app->argv, &endptr);
-  }
-
-  if (endptr == *app->argv) {
-    cli_opts_error("value not a number '%s'", *app->argv);
-    return false;
-  } else if (errno == ERANGE) {
-    cli_opts_error("value out of range '%s'", *app->argv);
-    return false;
-  }
-
-  switch (opt->type) {
-  case CLI_OPT_TYPE_INTEGER:
-    if (val.l > INT_MAX || val.l < INT_MIN) {
-      cli_opts_error("integer value out of range '%s'", *app->argv);
-      return false;
-    }
-    *(int *)opt->dest = (int)val.l;
-    break;
-  case CLI_OPT_TYPE_LONG:
-    *(long *)opt->dest = val.l;
-    break;
-  case CLI_OPT_TYPE_FLOAT:
-    *(float *)opt->dest = (float)val.d;
-    break;
-  case CLI_OPT_TYPE_DOUBLE:
-    *(double *)opt->dest = val.d;
-    break;
-  default:
-    cli_opts_error("how the fuck?");
-    return false;
-  }
-
-  return true;
-}
-
-void cli_opts_help(struct cli_opts *app) {
-  //
+static void cli_opts_help(struct cli_opts *app) {
+  // TODO: print help
 }
 
 static bool cli_opt_assign(struct cli_opts *const app,
@@ -190,8 +134,66 @@ static bool cli_opt_assign(struct cli_opts *const app,
   case CLI_OPT_TYPE_BOOLEAN:
     *(bool *)opt->dest = !*(bool *)opt->dest;
     break;
-  default:
-    return cli_opt_populate(app, opt);
+  default: {
+    const char *str;
+
+    if (app->token && *app->token != '\0') {
+      str = app->token;
+      app->token = NULL;
+    } else if (app->argc > 1) {
+      app->argc--;
+      app->argv++;
+      str = *app->argv;
+    } else {
+      cli_opts_error("no value '%s'", *app->argv);
+      return false;
+    }
+
+    char *endptr;
+    union {
+      long l;
+      double d;
+    } val;
+
+    if (opt->type == CLI_OPT_TYPE_INTEGER || opt->type == CLI_OPT_TYPE_LONG) {
+      val.l = strtol(str, &endptr, 10);
+    } else if (opt->type == CLI_OPT_TYPE_FLOAT ||
+               opt->type == CLI_OPT_TYPE_DOUBLE) {
+      val.d = strtod(str, &endptr);
+    }
+
+    if (endptr == str) {
+      cli_opts_error("value not a number '%s'", str);
+      return false;
+    } else if (errno == ERANGE) {
+      cli_opts_error("value out of range '%s'", str);
+      return false;
+    }
+
+    switch (opt->type) {
+    case CLI_OPT_TYPE_STRING:
+      *(const char **)opt->dest = str;
+      break;
+    case CLI_OPT_TYPE_INTEGER:
+      if (val.l > INT_MAX || val.l < INT_MIN) {
+        cli_opts_error("integer value out of range '%s'", str);
+        return false;
+      }
+      *(int *)opt->dest = (int)val.l;
+      break;
+    case CLI_OPT_TYPE_LONG:
+      *(long *)opt->dest = val.l;
+      break;
+    case CLI_OPT_TYPE_FLOAT:
+      *(float *)opt->dest = (float)val.d;
+      break;
+    case CLI_OPT_TYPE_DOUBLE:
+      *(double *)opt->dest = val.d;
+      break;
+    default:
+      return false;
+    }
+  }
   }
 
   return true;
@@ -204,8 +206,8 @@ static bool cli_opts_match_long(struct cli_opts *const app) {
 
   for (const struct cli_opt *o = app->opts; o->type != CLI_OPT_TYPE_END; o++) {
     if (o->longhand != NULL && strlen(o->longhand) == key_len &&
-        strncmp(o->longhand, app->token, key_len)) {
-      app->token = eq ? (eq + 1) : NULL;
+        strncmp(o->longhand, app->token, key_len) == 0) {
+      app->token = eq != NULL ? (eq + 1) : NULL;
 
       return cli_opt_assign(app, o);
     }
@@ -215,12 +217,21 @@ static bool cli_opts_match_long(struct cli_opts *const app) {
 }
 
 static int cli_opts_match_short(struct cli_opts *const app) {
-  for (const char *p = app->token; *p != '\0'; p++) {
+  while (app->token != NULL && *app->token != '\0') {
     for (const struct cli_opt *o = app->opts; o->type != CLI_OPT_TYPE_END;
          o++) {
-      if (o->shorthand == *p) {
-        cli_opt_assign(app, o);
-        return true;
+      if (o->shorthand == *app->token) {
+        app->token = (app->token[1] != '\0') ? (app->token + 1) : NULL;
+
+        if (!cli_opt_assign(app, o)) {
+          return false;
+        }
+
+        if (app->token == NULL) {
+          return true;
+        }
+
+        break;
       }
     }
   }
@@ -249,12 +260,13 @@ void cli_opts_parse(struct cli_opts *const app, const int argc,
       app->token = arg + 1;
 
       if (!cli_opts_match_short(app)) {
-        printf("unkown option: %s", arg);
+        goto unknown;
       }
 
       continue;
     }
 
+    // longhand option
     if (arg[2] == '\0') {
       app->argc--;
       app->argc++;
@@ -262,8 +274,14 @@ void cli_opts_parse(struct cli_opts *const app, const int argc,
     }
 
     app->token = arg + 2;
+
     if (!cli_opts_match_long(app)) {
-      return;
+      goto unknown;
     }
+
+    continue;
+
+  unknown:
+    printf("unknown option: %s\n", arg);
   }
 }

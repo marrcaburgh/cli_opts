@@ -9,3 +9,6 @@ target_link_libraries(shorthand PRIVATE test)
 
 add_executable(longhand longhand.c)
 target_link_libraries(longhand PRIVATE test)
+
+add_executable(cli cli.c)
+target_link_libraries(cli PRIVATE test)

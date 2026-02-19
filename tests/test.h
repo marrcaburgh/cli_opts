@@ -11,7 +11,7 @@ extern float f;
 extern double d;
 extern struct cli_opt opts[];
 
-#define ARRAY_LENGTH(x) sizeof(x) / sizeof(*x)
+#define ARRAY_LENGTH(x) (sizeof(x) / sizeof(*x))
 
 void callback(void *ctx);
 

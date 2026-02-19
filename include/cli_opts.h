@@ -5,49 +5,63 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef void (*cli_opt_action)(void *ctx);
+typedef void (*cli_opt_validate)(const char *str, void *ctx);
 
 enum cli_opt_type {
+  /* regular types */
   CLI_OPT_TYPE_BOOLEAN,
   CLI_OPT_TYPE_INTEGER,
   CLI_OPT_TYPE_LONG,
   CLI_OPT_TYPE_FLOAT,
   CLI_OPT_TYPE_DOUBLE,
   CLI_OPT_TYPE_STRING,
-  CLI_OPT_TYPE_ARRAY,
+
+  /* modifiers */
+  CLI_OPT_TYPE_MOD_NOT_NEGATIVE,
+  CLI_OPT_TYPE_MOD_NOT_EMPTY,
+  CLI_OPT_TYPE_MOD_REQUIRED,
+  CLI_OPT_TYPE_MOD_CUSTOM,
+  CLI_OPT_TYPE_MOD_ARRAY,
+
+  /* special types */
   CLI_OPT_TYPE_ACTION,
   CLI_OPT_TYPE_HELP,
   CLI_OPT_TYPE_END
 };
 
-struct cli_opt {
+typedef struct cli_opt {
   void *const dest;
   const char *longhand;
   enum cli_opt_type type;
   const char shorthand;
   const char *help;
-  cli_opt_action const action;
+  const cli_opt_action action;
   void *const ctx;
-};
+} cli_opt;
 
-struct cli_opts {
+typedef struct cli_opts {
   const struct cli_opt *opts;
   const char **argv;
   const char *token;
   int argc;
   const char *desc;
-};
+} cli_opts;
 
-#define CLI_OPT(sh, lh, typ, out, msg)                                         \
-  {.shorthand = sh, .longhand = lh, .type = typ, .outval = out, .helpmsg = msg}
+#define CLI_OPT(sh, lh, typ, dst, hlp)                                         \
+  {.shorthand = sh, .longhand = lh, .type = typ, .dest = dst, .help = hlp}
 
-#define CLI_OPT_ACTION(sh, lh, callback, context, msg)                         \
+#define CLI_OPT_ACTION(sh, lh, act, context, hlp)                              \
   {.shorthand = sh,                                                            \
    .longhand = lh,                                                             \
-   .type = CLI_OPT_TYPE_CALLBACK,                                              \
-   .cb = callback,                                                             \
+   .type = CLI_OPT_TYPE_ACTION,                                                \
+   .action = act,                                                              \
    .ctx = context,                                                             \
-   .helpmsg = msg}
+   .help = hlp}
 
 #if __STDC_VERSION__ >= 201112L
 #define CLI_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
@@ -68,5 +82,9 @@ void cli_opts_init(struct cli_opts *const app, struct cli_opt *const opts,
                    const char *const desc);
 void cli_opts_parse(struct cli_opts *const app, const int argc,
                     const char **const argv);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // CLI_OPTS_H
