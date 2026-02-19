@@ -25,47 +25,6 @@ static void cli_opts_error(const char *errstr, ...) {
 
 static void cli_opts_usage(const struct cli_opt *const opt) {}
 
-static bool cli_opts_to_num(struct cli_opts_app *const app,
-                            const struct cli_opt *opt) {
-  char *endptr;
-  errno = 0;
-
-  union {
-    long i;
-    float f;
-  } val;
-
-  if (opt->type == CLI_OPT_TYPE_INTEGER) {
-    val.i = strtol(*app->argv, &endptr, 10);
-    // else if long
-    // else if float
-    // else if doubl
-  } else {
-    val.f = strtof(*app->argv, &endptr);
-  }
-
-  if (endptr == *app->argv) {
-    cli_opts_error("not a number '%s'", app->argv);
-    return false;
-  } else if (errno == ERANGE) {
-    cli_opts_error("out of range '%s'", app->argv);
-    return false;
-  }
-
-  if (opt->type == CLI_OPT_TYPE_INTEGER) {
-    if (val.i > INT_MAX || val.i < INT_MIN) {
-      cli_opts_error("integer out of range '%s'", app->argv);
-      return false;
-    }
-
-    *(int *)opt->outval = (int)val.i;
-  } else {
-    *(float *)opt->outval = val.f;
-  }
-
-  return true;
-}
-
 static bool cli_opt_populate(struct cli_opts_app *const app,
                              const struct cli_opt *opt) {
   if (app->argc > 1) {
