@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 
-typedef void (*cli_opt_callback)(void *data);
+typedef void (*cli_opt_action)(void *ctx);
 
 enum cli_opt_type {
   CLI_OPT_TYPE_BOOLEAN,
@@ -15,31 +15,39 @@ enum cli_opt_type {
   CLI_OPT_TYPE_DOUBLE,
   CLI_OPT_TYPE_STRING,
   CLI_OPT_TYPE_ARRAY,
-  CLI_OPT_TYPE_CALLBACK,
+  CLI_OPT_TYPE_ACTION,
   CLI_OPT_TYPE_HELP,
   CLI_OPT_TYPE_END
 };
 
 struct cli_opt {
-  void *const outval;
+  void *const dest;
   const char *longhand;
   enum cli_opt_type type;
   const char shorthand;
-  const char *helpmsg;
-  cli_opt_callback const cb;
+  const char *help;
+  cli_opt_action const action;
   void *const ctx;
 };
 
-struct cli_opts_app {
+struct cli_opts {
   const struct cli_opt *opts;
   const char **argv;
-  const char *opt;
+  const char *token;
   int argc;
   const char *desc;
 };
 
 #define CLI_OPT(sh, lh, typ, out, msg)                                         \
   {.shorthand = sh, .longhand = lh, .type = typ, .outval = out, .helpmsg = msg}
+
+#define CLI_OPT_ACTION(sh, lh, callback, context, msg)                         \
+  {.shorthand = sh,                                                            \
+   .longhand = lh,                                                             \
+   .type = CLI_OPT_TYPE_CALLBACK,                                              \
+   .cb = callback,                                                             \
+   .ctx = context,                                                             \
+   .helpmsg = msg}
 
 #if __STDC_VERSION__ >= 201112L
 #define CLI_STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
@@ -56,9 +64,9 @@ struct cli_opts_app {
   CLI_STATIC_ASSERT((sizeof((struct cli_opt[]){__VA_ARGS__}) > 0),             \
                     "cli_opts error: options list cannot be empty")
 
-void cli_opts_init(struct cli_opts_app *const app, struct cli_opt *const opts,
+void cli_opts_init(struct cli_opts *const app, struct cli_opt *const opts,
                    const char *const desc);
-void cli_opts_parse(struct cli_opts_app *const app, const int argc,
+void cli_opts_parse(struct cli_opts *const app, const int argc,
                     const char **const argv);
 
 #endif // CLI_OPTS_H

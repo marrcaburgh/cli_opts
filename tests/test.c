@@ -16,7 +16,7 @@ CLI_OPTS(opts,
       CLI_OPT('l', "long", CLI_OPT_TYPE_LONG, &l, "a long"),
       CLI_OPT('f', "float", CLI_OPT_TYPE_FLOAT, &f, "a float"),
       CLI_OPT('d', "double", CLI_OPT_TYPE_DOUBLE, &d, "a double"),
-      CLI_OPT('c', "callback", CLI_OPT_TYPE_CALLBACK, callback, "a callback flag")
+      CLI_OPT_ACTION('c', "callback", callback, NULL, "a callback flag")
          // clang-format on
 );
 

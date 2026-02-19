@@ -9,12 +9,12 @@ int main() {
     "-i", "1",
     "-l", "1234567890",
     "-f", "1.234567",
-    "-d", "1.234567890",
+    "-d", "1.234567",
     "-c"
   };
   // clang-format on
 
-  struct cli_opts_app app;
+  struct cli_opts app;
 
   cli_opts_init(&app, opts, "An app description");
   cli_opts_parse(&app, ARRAY_LENGTH(argv), argv);
